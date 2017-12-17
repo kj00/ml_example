@@ -6,17 +6,18 @@ library(xgboost)
 
 ##
 bst <- xgboost(
-  data = as.matrix(x_train_tbl),
+  data = data.matrix(x_train_tbl),
   label = y_train_vec,
-  max_depth = 8,
-  eta = 1.2,
-  lambda = 100,
+  max_depth = 4,
+  eta = 0.02,
+  lambda = 2,
   nthread = 2,
-  nrounds = 80,
-  colsample_bytree = 1,
-  colsample_bylevel = 1,
-  objective = "binary:logistic"
-)
+  nrounds = 300,
+  subsample = 0.5,
+  colsample_bytree = 0.5,
+#  colsample_bylevel = 0.4,
+  objective = "binary:logistic",
+  eval_metric = "auc")
 
 
 #
@@ -27,9 +28,9 @@ pred <- predict(bst, as.matrix(x_test_tbl))
 # Format test data and predictions for yardstick metrics
 library(forcats)
 estimates_xgb_tbl <- tibble(
-  truth      =  as.factor(y_test_vec) %>% fct_recode(yes = "1", no = "0"),
+  truth      =  factor(y_test_vec, levels = c(1, 0)) %>% fct_recode(yes = "1", no = "0"),
   estimate   = as.integer(pred >= 0.5) %>%
-    as.factor() %>%
+    factor(levels = c(1, 0)) %>%
     fct_recode(yes = "1", no = "0"),
   class_prob = pred
 ) %>% 
@@ -47,7 +48,7 @@ estimates_xgb_tbl %>% metrics(truth, estimate)
 estimates_xgb_tbl %>% roc_auc(truth, class_prob)
 
 #loglos
-estimates_l2_tbl %>%
+estimates_xgb_tbl %>%
   mutate(class_prob_no = 1-class_prob) %>% 
   mnLogLoss(truth, class_prob, class_prob_no)
 
@@ -59,6 +60,16 @@ tibble(
 
 
 ##
+plot(y = estimates_xgb_tbl$test,
+     x = seq_len(length(estimates_xgb_tbl$test))/length(estimates_xgb_tbl$test))
+lines(x = seq(0, 1, 0.1),
+     y = seq(0, 1, 0.1))
+plot(y = estimates_lg_tbl$test,
+     x = seq_len(length(estimates_lg_tbl$test))/length(estimates_lg_tbl$test))
+
+
+
+##
 # Run lime() on training set
 explainer <- lime::lime(
   x              = x_train_tbl, 
@@ -67,9 +78,8 @@ explainer <- lime::lime(
 
 
 ##
-importance_matrix <- xgb.importance(model = bstSparse)
+importance_matrix <- xgb.importance(model = bst)
 print(importance_matrix)
-
 
 for (i in seq_along(importance_matrix$Feature)){
   importance_matrix$Feature[i] <- colnames(x_train_tbl)[i]

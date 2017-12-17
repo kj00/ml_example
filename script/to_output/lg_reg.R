@@ -6,7 +6,7 @@ lg_1 <- glm(Churn ~ .,
     data = train_tbl %>% 
       mutate(Churn = ifelse(Churn == "Yes", 1, 0)),
     family = binomial(link = "logit")) %>% 
-  stats::step(direction = "backward")
+  MASS::stepAIC(direction = "both")
 
 ##
 pred <- predict(lg_1,
@@ -18,9 +18,9 @@ hist(pred)
 library(forcats)
 
 estimates_lg_tbl <- tibble(
-  truth      =  as.factor(y_test_vec) %>% fct_recode(yes = "1", no = "0"),
+  truth      =  factor(y_test_vec, levels = 1:0) %>% fct_recode(yes = "1", no = "0"),
   estimate   = as.integer(pred >= 0.5) %>%
-    as.factor() %>%
+    factor(levels = 1:0) %>%
     fct_recode(yes = "1", no = "0"),
   class_prob = pred
 ) %>% 
